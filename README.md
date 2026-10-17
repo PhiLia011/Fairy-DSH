@@ -13,12 +13,24 @@ Fairy 的 DSH 插件套件（开源发布候选目录）。本目录与任何生
 
 ## 独立测试
 
-需要已安装并固定版本的 DSH CLI、Node.js 和 pnpm。测试时必须使用独立
-`DSH_HOME`，不要指向生产目录：
+需要 DSH CLI `0.1.1-rc.2`、Node.js 22 和 pnpm。该版本提供本套件依赖的
+`settingsNamespace`/`settingsScope` 与客户端模块加载契约；`0.1.2+` 和
+`0.2.x` 已改动这些接口，安装脚本会明确拒绝并提示版本不匹配。测试时必须
+使用独立 `DSH_HOME`，不要指向生产目录：
 
 ```sh
 DSH_HOME="$PWD/.dsh-test-home" ./scripts/test-isolated.sh
 ```
+
+Windows 使用等价入口：
+
+```powershell
+pwsh -File .\scripts\test-isolated.ps1
+```
+
+Browser Dock 在 Windows 默认使用系统 Edge，其他平台默认使用 Google Chrome。
+可设置 `DSH_FAIRY_BROWSER=chrome`、`msedge` 或 `chromium` 覆盖；选择
+`chromium` 时需先运行 `npx @playwright/mcp install-browser chrome-for-testing`。
 
 完整世界观资料、TTS 模型和用户数据应通过本地路径或私有配置注入，
 不会随此仓库分发。
