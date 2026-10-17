@@ -24,13 +24,12 @@ if [ "$installed_dsh_version" != "$expected_dsh_version" ] && [ "${DSH_ALLOW_UNS
 fi
 
 mkdir -p "$DSH_HOME"
-mkdir -p "$DSH_HOME/.agent-presets/fairy" "$DSH_HOME/accepted-baselines"
-for asset in runtime personality style canon behavior; do
-  if [ -e "$DSH_HOME/.agent-presets/fairy/$asset" ]; then
-    mv "$DSH_HOME/.agent-presets/fairy/$asset" "$DSH_HOME/.agent-presets/fairy/$asset.previous.$$"
-  fi
-  cp -R "$repo_root/.agent-presets/fairy/$asset" "$DSH_HOME/.agent-presets/fairy/$asset"
-done
+mkdir -p "$DSH_HOME/.agent-presets" "$DSH_HOME/accepted-baselines"
+preset_target="$DSH_HOME/.agent-presets/fairy"
+if [ -e "$preset_target" ]; then
+  mv "$preset_target" "$preset_target.previous.$$"
+fi
+cp -R "$repo_root/.agent-presets/fairy" "$preset_target"
 
 # Keep the profile in the candidate repository while presenting it at the
 # location expected by the DSH CLI. The symlink makes package link: entries
