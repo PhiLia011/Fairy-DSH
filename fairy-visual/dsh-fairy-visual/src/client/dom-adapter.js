@@ -101,7 +101,10 @@ const OFFICIAL_SELECTORS = Object.freeze({
   rootSurface: '[data-slot="root"]',
   sidebar: '[data-slot="sidebar"]',
   sidebarResizeHandle: '[data-side="sidebar"]',
-  conversation: '[data-slot="conversation"]',
+  // 0.2.x mounts the conversation surface as the current phase root instead
+  // of a separate `conversation` slot. The phase element owns the composer,
+  // scroll containers, and the session header.
+  conversation: '[data-phase="hero"], [data-phase="active"]',
   shellOverlay: '[data-slot="shell.overlay"]',
   settingsDialog: '[data-slot="sidebar.settings"] [role="dialog"]',
   phaseHero: '[data-phase="hero"]',
@@ -109,7 +112,8 @@ const OFFICIAL_SELECTORS = Object.freeze({
   phaseAny: '[data-phase]',
   composerSeat: '[data-composer-seat]',
   composerCard: '[data-composer-card="true"]',
-  composerTextarea: 'textarea',
+  composerTextarea: '[data-composer-input="true"], textarea',
+  composerPlaceholder: '[data-composer-placeholder="true"]',
   composerAttachmentsSlot: `[data-slot="${OFFICIAL_SLOT_VALUES.composerAttachments}"]`,
   conversationScroll: '[data-conversation-scroll]',
   inputScroll: '[data-input-scroll]',
@@ -325,11 +329,17 @@ function sidebarBrandButton(scope = document) {
 }
 function phase(scope = document, name) {
   if (!scope) return null;
-  if (name === 'hero') return officialNode('phaseHero', scope);
-  if (name === 'active') return officialNode('phaseActive', scope);
-  return officialNode('phaseActive', scope) || officialNode('phaseHero', scope);
+  const selector = name === 'hero'
+    ? OFFICIAL_SELECTORS.phaseHero
+    : name === 'active'
+      ? OFFICIAL_SELECTORS.phaseActive
+      : `${OFFICIAL_SELECTORS.phaseHero}, ${OFFICIAL_SELECTORS.phaseActive}`;
+  return scope.matches?.(selector) ? scope : officialNode(name === 'hero' ? 'phaseHero' : name === 'active' ? 'phaseActive' : 'phaseAny', scope);
 }
-function anyPhase(scope = document) { return officialNode('phaseAny', scope); }
+function anyPhase(scope = document) {
+  if (scope?.matches?.(OFFICIAL_SELECTORS.phaseAny)) return scope;
+  return officialNode('phaseAny', scope);
+}
 function sessionHeader(scope) { return officialNode('sessionHeader', scope); }
 function sessionHeaderActions(scope) { return officialNode('sessionHeaderActions', scope); }
 function sessionHeaderUtilities(scope) { return officialNode('sessionHeaderUtilities', scope); }
@@ -349,6 +359,7 @@ function headerElement(scope) { return officialNode('headerElement', scope); }
 function composerSeat(scope = document) { return officialNode('composerSeat', scope); }
 function composerCard(scope) { return officialNode('composerCard', scope); }
 function composerTextarea(scope) { return officialNode('composerTextarea', scope); }
+function composerPlaceholder(scope) { return officialNode('composerPlaceholder', scope); }
 function composerAttachmentsSlot(scope) {
   const selector = OFFICIAL_NODE_CONTRACTS.composerAttachmentsSlot.selector;
   return [...(scope?.children || [])].find((node) => (
@@ -531,6 +542,7 @@ module.exports = {
   composerSeat,
   composerCard,
   composerTextarea,
+  composerPlaceholder,
   composerAttachmentsSlot,
   conversationScroll,
   conversationScrolls,

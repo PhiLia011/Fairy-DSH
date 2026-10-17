@@ -3,9 +3,43 @@ const { jsx, jsxs } = require('react/jsx-runtime');
 const { MODE_ATTR, HERO_PLACEHOLDERS } = require('./constants.js');
 const { createManagedMutationObserver } = require('./dom-observer-manager.js');
 const { mutationTouchesSurface, mutationTouchesHeroSurface } = require('./surface-utils.js');
-const { OFFICIAL_SELECTORS, OFFICIAL_ATTRIBUTES, sidebar, conversation, phase, composerSeat, composerCard, composerTextarea } = require('./dom-adapter.js');
+const { OFFICIAL_SELECTORS, OFFICIAL_ATTRIBUTES, sidebar, conversation, phase, composerSeat, composerCard, composerTextarea, composerPlaceholder } = require('./dom-adapter.js');
 
 let heroMaskInstanceSeed = 0;
+
+function placeholderSnapshot(node) {
+  return {
+    placeholder: node?.getAttribute('placeholder') ?? null,
+    dataPlaceholder: node?.getAttribute('data-placeholder') ?? null,
+    ariaLabel: node?.getAttribute('aria-label') ?? null,
+  };
+}
+
+function currentPlaceholder(node) {
+  return node?.getAttribute('placeholder') ?? node?.getAttribute('data-placeholder') ?? null;
+}
+
+function applyPlaceholder(node, text) {
+  if (!node) return;
+  if (node.tagName === 'TEXTAREA') {
+    node.setAttribute('placeholder', text);
+    return;
+  }
+  node.setAttribute('data-placeholder', text);
+  node.setAttribute('aria-label', text);
+}
+
+function restorePlaceholder(node, snapshot) {
+  if (!node || !snapshot) return;
+  for (const [name, value] of [
+    ['placeholder', snapshot.placeholder],
+    ['data-placeholder', snapshot.dataPlaceholder],
+    ['aria-label', snapshot.ariaLabel],
+  ]) {
+    if (value === null) node.removeAttribute(name);
+    else node.setAttribute(name, value);
+  }
+}
 
 function install(_lifecycle = null, { Toggle, useController }) {
     // Lifecycle: hero projection, active placeholder and hero toggle
@@ -87,7 +121,7 @@ function install(_lifecycle = null, { Toggle, useController }) {
           structureObserver = createManagedMutationObserver((records) => {
             if (mutationTouchesHeroSurface(records, OFFICIAL_SELECTORS, OFFICIAL_ATTRIBUTES)) schedule();
           });
-          structureObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: [OFFICIAL_ATTRIBUTES.phase, 'placeholder'] });
+          structureObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: [OFFICIAL_ATTRIBUTES.phase, 'placeholder', 'data-placeholder'] });
         }
         window.addEventListener('resize', schedule, { passive: true });
         bindConversation();
@@ -128,6 +162,8 @@ function install(_lifecycle = null, { Toggle, useController }) {
         let textarea = null;
         let originalPlaceholder = null;
         let appliedPlaceholder = null;
+        let placeholderNode = null;
+        let originalPlaceholderText = null;
         let resizeObserver = null;
         let structureObserver = null;
         let modeObserver = null;
@@ -140,10 +176,9 @@ function install(_lifecycle = null, { Toggle, useController }) {
 
         const restoreTextarea = () => {
           if (!textarea) return;
-          const current = textarea.getAttribute('placeholder');
-          if (appliedPlaceholder !== null && current !== appliedPlaceholder) originalPlaceholder = current;
-          if (originalPlaceholder === null) textarea.removeAttribute('placeholder');
-          else textarea.setAttribute('placeholder', originalPlaceholder);
+          const current = currentPlaceholder(textarea);
+          if (appliedPlaceholder !== null && current !== appliedPlaceholder) originalPlaceholder = placeholderSnapshot(textarea);
+          restorePlaceholder(textarea, originalPlaceholder);
           textarea = null;
           originalPlaceholder = null;
           appliedPlaceholder = null;
@@ -152,6 +187,9 @@ function install(_lifecycle = null, { Toggle, useController }) {
           nativeHeadline?.classList.remove('dsh-fairy-hero-native-headline', 'dsh-fairy-hero-native-headline-hidden');
           nativeHeadline = null;
           restoreTextarea();
+          if (placeholderNode?.isConnected) placeholderNode.textContent = originalPlaceholderText;
+          placeholderNode = null;
+          originalPlaceholderText = null;
           host.setAttribute('data-active', 'false');
           if (resetHostGeometry) {
             host.style.removeProperty('left');
@@ -197,12 +235,25 @@ function install(_lifecycle = null, { Toggle, useController }) {
             if (textarea !== nextTextarea) {
               restoreTextarea();
               textarea = nextTextarea;
-              originalPlaceholder = textarea.getAttribute('placeholder');
+              originalPlaceholder = placeholderSnapshot(textarea);
             }
-            if (textarea.getAttribute('placeholder') !== replacementPlaceholder) textarea.setAttribute('placeholder', replacementPlaceholder);
+            if (currentPlaceholder(textarea) !== replacementPlaceholder) applyPlaceholder(textarea, replacementPlaceholder);
             appliedPlaceholder = replacementPlaceholder;
           } else {
             restoreTextarea();
+          }
+          const nextPlaceholderNode = composerPlaceholder(hero);
+          if (hddEnabled && nextPlaceholderNode) {
+            if (placeholderNode !== nextPlaceholderNode) {
+              if (placeholderNode?.isConnected) placeholderNode.textContent = originalPlaceholderText;
+              placeholderNode = nextPlaceholderNode;
+              originalPlaceholderText = nextPlaceholderNode.textContent;
+            }
+            if (nextPlaceholderNode.textContent !== replacementPlaceholder) nextPlaceholderNode.textContent = replacementPlaceholder;
+          } else if (placeholderNode) {
+            if (placeholderNode.isConnected) placeholderNode.textContent = originalPlaceholderText;
+            placeholderNode = null;
+            originalPlaceholderText = null;
           }
 
           const heroRect = hero.getBoundingClientRect();
@@ -275,9 +326,9 @@ function install(_lifecycle = null, { Toggle, useController }) {
 
         if (typeof MutationObserver === 'function' && document.body) {
           structureObserver = createManagedMutationObserver((records) => {
-            if (mutationTouchesSurface(records, `${OFFICIAL_SELECTORS.conversation}, ${OFFICIAL_SELECTORS.phaseHero}, ${OFFICIAL_SELECTORS.composerSeat}`, [OFFICIAL_ATTRIBUTES.phase, 'placeholder'])) scheduleHeroSync();
+            if (mutationTouchesSurface(records, `${OFFICIAL_SELECTORS.conversation}, ${OFFICIAL_SELECTORS.phaseHero}, ${OFFICIAL_SELECTORS.composerSeat}`, [OFFICIAL_ATTRIBUTES.phase, 'placeholder', 'data-placeholder', 'data-composer-placeholder'])) scheduleHeroSync();
           });
-          structureObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: [OFFICIAL_ATTRIBUTES.phase, 'placeholder'] });
+          structureObserver.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: [OFFICIAL_ATTRIBUTES.phase, 'placeholder', 'data-placeholder', 'data-composer-placeholder'] });
           modeObserver = createManagedMutationObserver(scheduleHeroSync);
           modeObserver.observe(document.documentElement, { attributes: true, attributeFilter: [MODE_ATTR] });
         }
@@ -351,10 +402,9 @@ function install(_lifecycle = null, { Toggle, useController }) {
 
         const restoreTextarea = () => {
           if (!textarea) return;
-          const current = textarea.getAttribute('placeholder');
-          if (appliedPlaceholder !== null && current !== appliedPlaceholder) originalPlaceholder = current;
-          if (originalPlaceholder === null) textarea.removeAttribute('placeholder');
-          else textarea.setAttribute('placeholder', originalPlaceholder);
+          const current = currentPlaceholder(textarea);
+          if (appliedPlaceholder !== null && current !== appliedPlaceholder) originalPlaceholder = placeholderSnapshot(textarea);
+          restorePlaceholder(textarea, originalPlaceholder);
           textarea = null;
           originalPlaceholder = null;
           appliedPlaceholder = null;
@@ -373,12 +423,12 @@ function install(_lifecycle = null, { Toggle, useController }) {
           if (textarea !== nextTextarea) {
             restoreTextarea();
             textarea = nextTextarea;
-            originalPlaceholder = textarea.getAttribute('placeholder');
+            originalPlaceholder = placeholderSnapshot(textarea);
           }
           const replacement = placeholderRef.current.text;
-          const current = textarea.getAttribute('placeholder');
-          if (appliedPlaceholder !== null && current !== appliedPlaceholder) originalPlaceholder = current;
-          if (current !== replacement) textarea.setAttribute('placeholder', replacement);
+          const current = currentPlaceholder(textarea);
+          if (appliedPlaceholder !== null && current !== appliedPlaceholder) originalPlaceholder = placeholderSnapshot(textarea);
+          if (current !== replacement) applyPlaceholder(textarea, replacement);
           appliedPlaceholder = replacement;
         };
         const schedulePlaceholderSync = () => {
@@ -387,9 +437,9 @@ function install(_lifecycle = null, { Toggle, useController }) {
 
         if (typeof MutationObserver === 'function' && document.body) {
           structureObserver = createManagedMutationObserver((records) => {
-            if (mutationTouchesSurface(records, `${OFFICIAL_SELECTORS.conversation}, ${OFFICIAL_SELECTORS.phaseActive}, ${OFFICIAL_SELECTORS.composerSeat}`, [OFFICIAL_ATTRIBUTES.phase, OFFICIAL_ATTRIBUTES.composerSeat, 'placeholder'])) schedulePlaceholderSync();
+            if (mutationTouchesSurface(records, `${OFFICIAL_SELECTORS.conversation}, ${OFFICIAL_SELECTORS.phaseActive}, ${OFFICIAL_SELECTORS.composerSeat}`, [OFFICIAL_ATTRIBUTES.phase, OFFICIAL_ATTRIBUTES.composerSeat, 'placeholder', 'data-placeholder'])) schedulePlaceholderSync();
           });
-          structureObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: [OFFICIAL_ATTRIBUTES.phase, OFFICIAL_ATTRIBUTES.composerSeat, 'placeholder'] });
+          structureObserver.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: [OFFICIAL_ATTRIBUTES.phase, OFFICIAL_ATTRIBUTES.composerSeat, 'placeholder', 'data-placeholder', 'data-composer-placeholder'] });
           modeObserver = createManagedMutationObserver(schedulePlaceholderSync);
           modeObserver.observe(document.documentElement, { attributes: true, attributeFilter: [MODE_ATTR] });
         }

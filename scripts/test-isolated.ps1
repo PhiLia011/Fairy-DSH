@@ -3,14 +3,14 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $testHome = if ($env:DSH_HOME) { [IO.Path]::GetFullPath($env:DSH_HOME) } else { Join-Path $repoRoot '.dsh-test-home' }
-$expectedDshVersion = '0.1.1-rc.2'
+$expectedDshVersion = '0.2.1-alpha.5'
 
 $dshCommand = Get-Command dsh.cmd -ErrorAction SilentlyContinue
 if (-not $dshCommand) { $dshCommand = Get-Command dsh -ErrorAction SilentlyContinue }
 if (-not $dshCommand) { throw 'dsh CLI is required for the isolated smoke test' }
 $installedDshVersion = (& $dshCommand.Source --version 2>$null | Select-Object -First 1)
 if ($installedDshVersion -ne $expectedDshVersion -and $env:DSH_ALLOW_UNSUPPORTED -ne '1') {
-  throw "DSH $expectedDshVersion is required; found $installedDshVersion. This suite depends on settingsNamespace/settingsScope and the 0.1 client module loader. Install the pinned CLI, or set DSH_ALLOW_UNSUPPORTED=1 to continue anyway."
+  throw "DSH $expectedDshVersion is required; found $installedDshVersion. This suite depends on the 0.2 Remote settings API and client module loader. Install the pinned CLI, or set DSH_ALLOW_UNSUPPORTED=1 to continue anyway."
 }
 
 $env:DSH_HOME = $testHome

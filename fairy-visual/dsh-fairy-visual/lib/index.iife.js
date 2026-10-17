@@ -619,7 +619,7 @@ html[data-dsh-fairy-visual],html[data-dsh-fairy-visual] body{color-scheme:dark}h
 			rootSurface: "[data-slot=\"root\"]",
 			sidebar: "[data-slot=\"sidebar\"]",
 			sidebarResizeHandle: "[data-side=\"sidebar\"]",
-			conversation: "[data-slot=\"conversation\"]",
+			conversation: "[data-phase=\"hero\"], [data-phase=\"active\"]",
 			shellOverlay: "[data-slot=\"shell.overlay\"]",
 			settingsDialog: "[data-slot=\"sidebar.settings\"] [role=\"dialog\"]",
 			phaseHero: "[data-phase=\"hero\"]",
@@ -627,7 +627,8 @@ html[data-dsh-fairy-visual],html[data-dsh-fairy-visual] body{color-scheme:dark}h
 			phaseAny: "[data-phase]",
 			composerSeat: "[data-composer-seat]",
 			composerCard: "[data-composer-card=\"true\"]",
-			composerTextarea: "textarea",
+			composerTextarea: "[data-composer-input=\"true\"], textarea",
+			composerPlaceholder: "[data-composer-placeholder=\"true\"]",
 			composerAttachmentsSlot: `[data-slot="${OFFICIAL_SLOT_VALUES.composerAttachments}"]`,
 			conversationScroll: "[data-conversation-scroll]",
 			inputScroll: "[data-input-scroll]",
@@ -950,11 +951,11 @@ html[data-dsh-fairy-visual],html[data-dsh-fairy-visual] body{color-scheme:dark}h
 		}
 		function phase(scope = document, name) {
 			if (!scope) return null;
-			if (name === "hero") return officialNode("phaseHero", scope);
-			if (name === "active") return officialNode("phaseActive", scope);
-			return officialNode("phaseActive", scope) || officialNode("phaseHero", scope);
+			const selector = name === "hero" ? OFFICIAL_SELECTORS.phaseHero : name === "active" ? OFFICIAL_SELECTORS.phaseActive : `${OFFICIAL_SELECTORS.phaseHero}, ${OFFICIAL_SELECTORS.phaseActive}`;
+			return scope.matches?.(selector) ? scope : officialNode(name === "hero" ? "phaseHero" : name === "active" ? "phaseActive" : "phaseAny", scope);
 		}
 		function anyPhase(scope = document) {
+			if (scope?.matches?.(OFFICIAL_SELECTORS.phaseAny)) return scope;
 			return officialNode("phaseAny", scope);
 		}
 		function sessionHeader(scope) {
@@ -980,6 +981,9 @@ html[data-dsh-fairy-visual],html[data-dsh-fairy-visual] body{color-scheme:dark}h
 		}
 		function composerTextarea(scope) {
 			return officialNode("composerTextarea", scope);
+		}
+		function composerPlaceholder(scope) {
+			return officialNode("composerPlaceholder", scope);
 		}
 		function composerAttachmentsSlot(scope) {
 			const selector = OFFICIAL_NODE_CONTRACTS.composerAttachmentsSlot.selector;
@@ -1172,6 +1176,7 @@ html[data-dsh-fairy-visual],html[data-dsh-fairy-visual] body{color-scheme:dark}h
 			composerSeat,
 			composerCard,
 			composerTextarea,
+			composerPlaceholder,
 			composerAttachmentsSlot,
 			conversationScroll,
 			conversationScrolls,
@@ -5568,8 +5573,36 @@ html[data-dsh-fairy-visual][data-dsh-fairy-theme="light"] [data-dsh-fairy-mascot
 		const { MODE_ATTR, HERO_PLACEHOLDERS } = (init_constants(), __toCommonJS(constants_exports));
 		const { createManagedMutationObserver } = require_dom_observer_manager();
 		const { mutationTouchesSurface, mutationTouchesHeroSurface } = require_surface_utils();
-		const { OFFICIAL_SELECTORS, OFFICIAL_ATTRIBUTES, sidebar, conversation, phase, composerSeat, composerCard, composerTextarea } = require_dom_adapter();
+		const { OFFICIAL_SELECTORS, OFFICIAL_ATTRIBUTES, sidebar, conversation, phase, composerSeat, composerCard, composerTextarea, composerPlaceholder } = require_dom_adapter();
 		let heroMaskInstanceSeed = 0;
+		function placeholderSnapshot(node) {
+			return {
+				placeholder: node?.getAttribute("placeholder") ?? null,
+				dataPlaceholder: node?.getAttribute("data-placeholder") ?? null,
+				ariaLabel: node?.getAttribute("aria-label") ?? null
+			};
+		}
+		function currentPlaceholder(node) {
+			return node?.getAttribute("placeholder") ?? node?.getAttribute("data-placeholder") ?? null;
+		}
+		function applyPlaceholder(node, text) {
+			if (!node) return;
+			if (node.tagName === "TEXTAREA") {
+				node.setAttribute("placeholder", text);
+				return;
+			}
+			node.setAttribute("data-placeholder", text);
+			node.setAttribute("aria-label", text);
+		}
+		function restorePlaceholder(node, snapshot) {
+			if (!node || !snapshot) return;
+			for (const [name, value] of [
+				["placeholder", snapshot.placeholder],
+				["data-placeholder", snapshot.dataPlaceholder],
+				["aria-label", snapshot.ariaLabel]
+			]) if (value === null) node.removeAttribute(name);
+			else node.setAttribute(name, value);
+		}
 		function install(_lifecycle = null, { Toggle, useController }) {
 			function HeroToggleHost({ controller }) {
 				const hostRef = React$1.useRef(null);
@@ -5642,7 +5675,11 @@ html[data-dsh-fairy-visual][data-dsh-fairy-theme="light"] [data-dsh-fairy-mascot
 							childList: true,
 							subtree: true,
 							attributes: true,
-							attributeFilter: [OFFICIAL_ATTRIBUTES.phase, "placeholder"]
+							attributeFilter: [
+								OFFICIAL_ATTRIBUTES.phase,
+								"placeholder",
+								"data-placeholder"
+							]
 						});
 					}
 					window.addEventListener("resize", schedule, { passive: true });
@@ -5687,6 +5724,8 @@ html[data-dsh-fairy-visual][data-dsh-fairy-theme="light"] [data-dsh-fairy-mascot
 					let textarea = null;
 					let originalPlaceholder = null;
 					let appliedPlaceholder = null;
+					let placeholderNode = null;
+					let originalPlaceholderText = null;
 					let resizeObserver = null;
 					let structureObserver = null;
 					let modeObserver = null;
@@ -5698,10 +5737,9 @@ html[data-dsh-fairy-visual][data-dsh-fairy-theme="light"] [data-dsh-fairy-mascot
 					let observedSidebarFrame = null;
 					const restoreTextarea = () => {
 						if (!textarea) return;
-						const current = textarea.getAttribute("placeholder");
-						if (appliedPlaceholder !== null && current !== appliedPlaceholder) originalPlaceholder = current;
-						if (originalPlaceholder === null) textarea.removeAttribute("placeholder");
-						else textarea.setAttribute("placeholder", originalPlaceholder);
+						const current = currentPlaceholder(textarea);
+						if (appliedPlaceholder !== null && current !== appliedPlaceholder) originalPlaceholder = placeholderSnapshot(textarea);
+						restorePlaceholder(textarea, originalPlaceholder);
 						textarea = null;
 						originalPlaceholder = null;
 						appliedPlaceholder = null;
@@ -5710,6 +5748,9 @@ html[data-dsh-fairy-visual][data-dsh-fairy-theme="light"] [data-dsh-fairy-mascot
 						nativeHeadline?.classList.remove("dsh-fairy-hero-native-headline", "dsh-fairy-hero-native-headline-hidden");
 						nativeHeadline = null;
 						restoreTextarea();
+						if (placeholderNode?.isConnected) placeholderNode.textContent = originalPlaceholderText;
+						placeholderNode = null;
+						originalPlaceholderText = null;
 						host.setAttribute("data-active", "false");
 						if (resetHostGeometry) {
 							host.style.removeProperty("left");
@@ -5751,11 +5792,24 @@ html[data-dsh-fairy-visual][data-dsh-fairy-theme="light"] [data-dsh-fairy-mascot
 							if (textarea !== nextTextarea) {
 								restoreTextarea();
 								textarea = nextTextarea;
-								originalPlaceholder = textarea.getAttribute("placeholder");
+								originalPlaceholder = placeholderSnapshot(textarea);
 							}
-							if (textarea.getAttribute("placeholder") !== replacementPlaceholder) textarea.setAttribute("placeholder", replacementPlaceholder);
+							if (currentPlaceholder(textarea) !== replacementPlaceholder) applyPlaceholder(textarea, replacementPlaceholder);
 							appliedPlaceholder = replacementPlaceholder;
 						} else restoreTextarea();
+						const nextPlaceholderNode = composerPlaceholder(hero);
+						if (hddEnabled && nextPlaceholderNode) {
+							if (placeholderNode !== nextPlaceholderNode) {
+								if (placeholderNode?.isConnected) placeholderNode.textContent = originalPlaceholderText;
+								placeholderNode = nextPlaceholderNode;
+								originalPlaceholderText = nextPlaceholderNode.textContent;
+							}
+							if (nextPlaceholderNode.textContent !== replacementPlaceholder) nextPlaceholderNode.textContent = replacementPlaceholder;
+						} else if (placeholderNode) {
+							if (placeholderNode.isConnected) placeholderNode.textContent = originalPlaceholderText;
+							placeholderNode = null;
+							originalPlaceholderText = null;
+						}
 						const heroRect = hero.getBoundingClientRect();
 						const center = heroRect.left + heroRect.width * .5;
 						host.style.left = Math.round(center) + "px";
@@ -5811,13 +5865,24 @@ html[data-dsh-fairy-visual][data-dsh-fairy-theme="light"] [data-dsh-fairy-mascot
 					if (typeof MutationObserver === "function") sidebarLayoutObserver = createManagedMutationObserver(scheduleHeroSync);
 					if (typeof MutationObserver === "function" && document.body) {
 						structureObserver = createManagedMutationObserver((records) => {
-							if (mutationTouchesSurface(records, `${OFFICIAL_SELECTORS.conversation}, ${OFFICIAL_SELECTORS.phaseHero}, ${OFFICIAL_SELECTORS.composerSeat}`, [OFFICIAL_ATTRIBUTES.phase, "placeholder"])) scheduleHeroSync();
+							if (mutationTouchesSurface(records, `${OFFICIAL_SELECTORS.conversation}, ${OFFICIAL_SELECTORS.phaseHero}, ${OFFICIAL_SELECTORS.composerSeat}`, [
+								OFFICIAL_ATTRIBUTES.phase,
+								"placeholder",
+								"data-placeholder",
+								"data-composer-placeholder"
+							])) scheduleHeroSync();
 						});
 						structureObserver.observe(document.body, {
 							childList: true,
 							subtree: true,
+							characterData: true,
 							attributes: true,
-							attributeFilter: [OFFICIAL_ATTRIBUTES.phase, "placeholder"]
+							attributeFilter: [
+								OFFICIAL_ATTRIBUTES.phase,
+								"placeholder",
+								"data-placeholder",
+								"data-composer-placeholder"
+							]
 						});
 						modeObserver = createManagedMutationObserver(scheduleHeroSync);
 						modeObserver.observe(document.documentElement, {
@@ -6007,10 +6072,9 @@ html[data-dsh-fairy-visual][data-dsh-fairy-theme="light"] [data-dsh-fairy-mascot
 					};
 					const restoreTextarea = () => {
 						if (!textarea) return;
-						const current = textarea.getAttribute("placeholder");
-						if (appliedPlaceholder !== null && current !== appliedPlaceholder) originalPlaceholder = current;
-						if (originalPlaceholder === null) textarea.removeAttribute("placeholder");
-						else textarea.setAttribute("placeholder", originalPlaceholder);
+						const current = currentPlaceholder(textarea);
+						if (appliedPlaceholder !== null && current !== appliedPlaceholder) originalPlaceholder = placeholderSnapshot(textarea);
+						restorePlaceholder(textarea, originalPlaceholder);
 						textarea = null;
 						originalPlaceholder = null;
 						appliedPlaceholder = null;
@@ -6024,12 +6088,12 @@ html[data-dsh-fairy-visual][data-dsh-fairy-theme="light"] [data-dsh-fairy-mascot
 						if (textarea !== nextTextarea) {
 							restoreTextarea();
 							textarea = nextTextarea;
-							originalPlaceholder = textarea.getAttribute("placeholder");
+							originalPlaceholder = placeholderSnapshot(textarea);
 						}
 						const replacement = placeholderRef.current.text;
-						const current = textarea.getAttribute("placeholder");
-						if (appliedPlaceholder !== null && current !== appliedPlaceholder) originalPlaceholder = current;
-						if (current !== replacement) textarea.setAttribute("placeholder", replacement);
+						const current = currentPlaceholder(textarea);
+						if (appliedPlaceholder !== null && current !== appliedPlaceholder) originalPlaceholder = placeholderSnapshot(textarea);
+						if (current !== replacement) applyPlaceholder(textarea, replacement);
 						appliedPlaceholder = replacement;
 					};
 					const schedulePlaceholderSync = () => {
@@ -6040,17 +6104,21 @@ html[data-dsh-fairy-visual][data-dsh-fairy-theme="light"] [data-dsh-fairy-mascot
 							if (mutationTouchesSurface(records, `${OFFICIAL_SELECTORS.conversation}, ${OFFICIAL_SELECTORS.phaseActive}, ${OFFICIAL_SELECTORS.composerSeat}`, [
 								OFFICIAL_ATTRIBUTES.phase,
 								OFFICIAL_ATTRIBUTES.composerSeat,
-								"placeholder"
+								"placeholder",
+								"data-placeholder"
 							])) schedulePlaceholderSync();
 						});
 						structureObserver.observe(document.body, {
 							childList: true,
 							subtree: true,
+							characterData: true,
 							attributes: true,
 							attributeFilter: [
 								OFFICIAL_ATTRIBUTES.phase,
 								OFFICIAL_ATTRIBUTES.composerSeat,
-								"placeholder"
+								"placeholder",
+								"data-placeholder",
+								"data-composer-placeholder"
 							]
 						});
 						modeObserver = createManagedMutationObserver(schedulePlaceholderSync);
@@ -6235,6 +6303,131 @@ html[data-dsh-fairy-visual][data-dsh-fairy-theme="light"] [data-dsh-fairy-mascot
 			LOCK_ATTRIBUTE
 		};
 	}));
+
+//#endregion
+//#region src/client/settings-bridge.js
+	var settings_bridge_exports = /* @__PURE__ */ __exportAll({
+		createSettingsProjection: () => createSettingsProjection,
+		createSettingsScope: () => createSettingsScope
+	});
+	/**
+	* DSH 0.2.x stores plugin preferences in the profile entry's volatile Config.
+	* The client reads them through `remote.settings`; there is no settingsScope
+	* service in this runtime.
+	*/
+	function createSettingsScope(ctx, { namespace, defaults, path = [] }) {
+		let currentView = null;
+		let disposed = false;
+		let snapshot = {
+			status: "loading",
+			value: defaults,
+			revision: void 0,
+			writable: false,
+			error: null
+		};
+		const listeners = /* @__PURE__ */ new Set();
+		const emit = () => {
+			if (!disposed) for (const listener of [...listeners]) listener();
+		};
+		const project = (row) => {
+			let value = row?.value;
+			for (const key of path) value = value && typeof value === "object" ? value[key] : void 0;
+			return {
+				status: row === void 0 ? "unavailable" : "ready",
+				value: value && typeof value === "object" ? value : defaults,
+				revision: row?.revision,
+				writable: Boolean(currentView?.writable),
+				error: null
+			};
+		};
+		const applyView = (view) => {
+			if (!view) return;
+			if (Array.isArray(view.namespaces)) currentView = view;
+			else if (view.ns) {
+				const namespaces = currentView?.namespaces || [];
+				currentView = {
+					writable: currentView?.writable ?? true,
+					namespaces: namespaces.some((row) => row.ns === view.ns) ? namespaces.map((row) => row.ns === view.ns ? view : row) : [...namespaces, view]
+				};
+			}
+			snapshot = project((currentView?.namespaces || []).find((row) => row.ns === namespace));
+			emit();
+		};
+		const load = async () => {
+			try {
+				const response = await ctx.remote.settings.describe();
+				if (disposed) return;
+				if (!response?.ok) {
+					snapshot = {
+						...snapshot,
+						status: "error",
+						error: response?.error?.message || "settings unavailable"
+					};
+					emit();
+					return;
+				}
+				applyView(response.value);
+			} catch (error) {
+				if (disposed) return;
+				snapshot = {
+					...snapshot,
+					status: "error",
+					error: String(error?.message || error)
+				};
+				emit();
+			}
+		};
+		const offDocument = ctx.remote.$on?.("settings/document-updated", (updated) => {
+			if (updated === namespace) load();
+		});
+		const offReset = ctx.on?.("connection/reset", () => void load());
+		load();
+		return {
+			getSnapshot: () => snapshot,
+			subscribe: (listener) => {
+				listeners.add(listener);
+				return () => listeners.delete(listener);
+			},
+			async setPath(targetPath, value) {
+				const response = await ctx.remote.settings.mutate(namespace, [{
+					op: "set",
+					path: targetPath,
+					value
+				}], snapshot.revision);
+				if (!response?.ok) throw new Error(response?.error?.message || "settings write failed");
+				applyView(response.value);
+			},
+			set(field, value) {
+				return this.setPath([...path, field], value);
+			},
+			dispose() {
+				disposed = true;
+				offDocument?.();
+				offReset?.();
+				listeners.clear();
+			}
+		};
+	}
+	/** Derive a nested settings view from the namespace's single revisioned scope. */
+	function createSettingsProjection(root, { path, defaults }) {
+		return {
+			getSnapshot() {
+				const snapshot = root.getSnapshot();
+				let value = snapshot.value;
+				for (const key of path) value = value && typeof value === "object" ? value[key] : void 0;
+				return {
+					...snapshot,
+					value: value && typeof value === "object" ? value : defaults
+				};
+			},
+			subscribe: root.subscribe,
+			set(field, value) {
+				return root.setPath([...path, field], value);
+			},
+			dispose() {}
+		};
+	}
+	var init_settings_bridge = __esmMin((() => {}));
 
 //#endregion
 //#region src/client/settings-normalizer.cjs
@@ -6825,7 +7018,6 @@ html[data-dsh-fairy-visual][data-dsh-fairy-theme="light"] [data-dsh-fairy-mascot
 		const { jsx, jsxs } = require("react/jsx-runtime");
 		const { createFairyDiagnostics } = require_client_diagnostics();
 		const { SETTINGS_NAMESPACE, STYLE_ID, MODE_ATTR, POWER_MODE_ATTR, THEME_ATTR, POWER_TOGGLE_WIDTH, POWER_TOGGLE_HEIGHT, DEFAULT } = (init_constants(), __toCommonJS(constants_exports));
-		const IDENTITY_SETTINGS_NAMESPACE = "fairy-identity";
 		const { deriveSessionActivity, syncDocumentMode } = (init_utils(), __toCommonJS(utils_exports));
 		const { injectStyles } = (init_style(), __toCommonJS(style_exports));
 		const { mountComposerDock } = require_composer_dock();
@@ -6845,6 +7037,7 @@ html[data-dsh-fairy-visual][data-dsh-fairy-theme="light"] [data-dsh-fairy-mascot
 		const { createSelectionGuard } = require_selection_guard();
 		const { scheduleMascotScale, MASCOT_GEOMETRY_EVENT } = require_mascot_scale_control();
 		const { saveControllerSetting } = require_settings_write();
+		const { createSettingsScope, createSettingsProjection } = (/* @__PURE__ */ init_settings_bridge(), __toCommonJS(settings_bridge_exports));
 		const { mutationTouchesSurface } = require_surface_utils();
 		const { migrateVisualSettings, normalizeSetting } = require_settings_normalizer();
 		const { createVisualTransitions } = require_visual_transitions();
@@ -6910,7 +7103,8 @@ html[data-dsh-fairy-visual][data-dsh-fairy-theme="light"] [data-dsh-fairy-mascot
 				this.listeners.forEach((listener) => listener());
 			}
 			bind() {
-				const id = this.sessions.list.getSnapshot().current;
+				const list = this.sessions.list.getSnapshot();
+				const id = list.current ?? Object.values(list.byId || {}).find((row) => (row?.retainedBy?.mainView ?? 0) > 0)?.id;
 				const next = id == null ? null : this.sessions.binding(id)?.session || null;
 				if (this.hasBoundSession && id !== this.boundSessionId && this.state.settings.enabled) this.sessionTransition.trigger();
 				this.boundSessionId = id;
@@ -7780,8 +7974,23 @@ html[data-dsh-fairy-visual][data-dsh-fairy-theme="light"] [data-dsh-fairy-mascot
 		}
 		function apply(ctx) {
 			return diagnostics.guard("apply", () => {
-				const settings = ctx.settingsScope.bind({ namespace: SETTINGS_NAMESPACE });
-				const identitySettings = ctx.settingsScope.bind({ namespace: IDENTITY_SETTINGS_NAMESPACE });
+				const settings = createSettingsScope(ctx, {
+					namespace: SETTINGS_NAMESPACE,
+					defaults: DEFAULT
+				});
+				const identitySettings = createSettingsProjection(settings, {
+					path: ["identity"],
+					defaults: {
+						mode: "ling",
+						customName: "",
+						secondAssistant: "",
+						household: []
+					}
+				});
+				ctx.effect(() => () => {
+					settings.dispose();
+					identitySettings.dispose();
+				}, "dsh-fairy-visual settings scopes");
 				syncDocumentMode(settings.getSnapshot());
 				injectStyles();
 				const selectionGuard = createSelectionGuard({ selector: [
@@ -7824,7 +8033,8 @@ html[data-dsh-fairy-visual][data-dsh-fairy-theme="light"] [data-dsh-fairy-mascot
 			inject: [
 				"slots",
 				"sessions",
-				"settingsScope"
+				"remote",
+				"remote.settings"
 			],
 			name: "dsh-fairy-visual"
 		};

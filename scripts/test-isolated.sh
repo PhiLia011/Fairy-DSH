@@ -10,7 +10,7 @@ export DSH_FAIRY_TEST_HOME="$test_home"
 export DSH_FAIRY_PROFILE_ROOT="$repo_root/profiles/web"
 export DSH_ACCEPTED_BASELINE_ROOT="$test_home/accepted-baselines"
 
-expected_dsh_version="0.1.1-rc.2"
+expected_dsh_version="0.2.1-alpha.5"
 if ! command -v dsh >/dev/null 2>&1; then
   echo "dsh CLI is required for the isolated smoke test." >&2
   exit 1
@@ -18,7 +18,7 @@ fi
 installed_dsh_version=$(dsh --version 2>/dev/null | head -n 1 || true)
 if [ "$installed_dsh_version" != "$expected_dsh_version" ] && [ "${DSH_ALLOW_UNSUPPORTED:-0}" != "1" ]; then
   echo "DSH $expected_dsh_version is required; found ${installed_dsh_version:-none}." >&2
-  echo "This suite depends on settingsNamespace/settingsScope and the 0.1 client module loader." >&2
+  echo "This suite depends on the 0.2 Remote settings API and client module loader." >&2
   echo "Install the pinned CLI, or set DSH_ALLOW_UNSUPPORTED=1 to continue anyway." >&2
   exit 1
 fi

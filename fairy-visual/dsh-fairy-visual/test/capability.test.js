@@ -50,6 +50,7 @@ function mountedDocument({ phase = 'active' } = {}) {
   return node({
     'body > #root > [data-slot="root"]': node(),
     '[data-slot="shell.overlay"]': node(),
+    '[data-phase="hero"], [data-phase="active"]': conversation,
     '[data-slot="conversation"]': conversation,
     '[data-slot="sidebar"]': node(),
     '[data-slot="conversation.session.header"]': phase === 'active' ? node() : null,
