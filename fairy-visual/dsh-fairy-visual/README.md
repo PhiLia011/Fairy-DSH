@@ -48,15 +48,15 @@ separate host settings namespace:
 ```json
 {
   "version": 2,
-  "enabled": false,
+  "enabled": true,
   "theme": "dark",
   "mascotVisible": true,
   "powerMode": "normal"
 }
 ```
 
-`enabled` defaults to `false`, so registration alone cannot visually change an
-existing session. Fresh-document session selection belongs to the separate
+`enabled` defaults to `true`, so a fresh profile starts in HDD mode. Existing
+stored preferences still win. Fresh-document session selection belongs to the separate
 `dsh-fairy-startup` plugin; this package never starts, clears, or opens a
 session.
 

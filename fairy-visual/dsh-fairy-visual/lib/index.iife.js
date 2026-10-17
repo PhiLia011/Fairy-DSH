@@ -206,7 +206,7 @@ window.__ModuleLoader__.load({
 		POWER_TOGGLE_HEIGHT = 22;
 		DEFAULT = {
 			version: 2,
-			enabled: false,
+			enabled: true,
 			theme: "dark",
 			mascotVisible: true,
 			mascotScale: 1,
@@ -511,6 +511,10 @@ html[data-dsh-fairy-visual],html[data-dsh-fairy-visual] body{color-scheme:dark}h
 				zh: Object.freeze(["收起侧边栏"]),
 				en: Object.freeze(["Collapse sidebar"])
 			}),
+			rightSidebarToggle: Object.freeze({
+				zh: Object.freeze(["打开右侧边栏", "收起右侧边栏"]),
+				en: Object.freeze(["Open right sidebar", "Collapse right sidebar"])
+			}),
 			send: Object.freeze({
 				zh: Object.freeze([
 					"发送消息",
@@ -641,6 +645,7 @@ html[data-dsh-fairy-visual],html[data-dsh-fairy-visual] body{color-scheme:dark}h
 			sidebarBrandMark: "[data-slot=\"sidebar.brand.mark\"]",
 			openSidebar: ariaLabelSelector("openSidebar", { base: "body > #root > [data-slot=\"root\"] button" }),
 			collapseSidebar: ariaLabelSelector("collapseSidebar", { base: "body > #root > [data-slot=\"root\"] button" }),
+			rightSidebarToggle: ariaLabelSelector("rightSidebarToggle", { base: "button" }),
 			newSession: ariaLabelSelector("newSession", { base: "button" }),
 			sessionHeader: "[data-slot=\"conversation.session.header\"]",
 			sessionHeaderActions: "[data-slot=\"conversation.session.header.actions\"]",
@@ -910,6 +915,9 @@ html[data-dsh-fairy-visual],html[data-dsh-fairy-visual] body{color-scheme:dark}h
 		function sidebarCollapseControl(doc = document) {
 			return officialNode("collapseSidebar", doc);
 		}
+		function rightSidebarToggle(doc = document) {
+			return officialNode("rightSidebarToggle", doc);
+		}
 		const reportedFuzzyMatches = /* @__PURE__ */ new Set();
 		function findByAriaLabelFuzzy(scope, { role, labels }) {
 			const candidates = queryAll(scope, `[role="${role}"]`);
@@ -1160,6 +1168,7 @@ html[data-dsh-fairy-visual],html[data-dsh-fairy-visual] body{color-scheme:dark}h
 			sidebarResizeHandle,
 			sidebarOpenControl,
 			sidebarCollapseControl,
+			rightSidebarToggle,
 			sessionTree,
 			sessionItems,
 			expandedSessionItems,
@@ -5573,7 +5582,7 @@ html[data-dsh-fairy-visual][data-dsh-fairy-theme="light"] [data-dsh-fairy-mascot
 		const { MODE_ATTR, HERO_PLACEHOLDERS } = (init_constants(), __toCommonJS(constants_exports));
 		const { createManagedMutationObserver } = require_dom_observer_manager();
 		const { mutationTouchesSurface, mutationTouchesHeroSurface } = require_surface_utils();
-		const { OFFICIAL_SELECTORS, OFFICIAL_ATTRIBUTES, sidebar, conversation, phase, composerSeat, composerCard, composerTextarea, composerPlaceholder } = require_dom_adapter();
+		const { OFFICIAL_SELECTORS, OFFICIAL_ATTRIBUTES, sidebar, conversation, phase, composerSeat, composerCard, composerTextarea, composerPlaceholder, rightSidebarToggle } = require_dom_adapter();
 		let heroMaskInstanceSeed = 0;
 		function placeholderSnapshot(node) {
 			return {
@@ -5641,7 +5650,10 @@ html[data-dsh-fairy-visual][data-dsh-fairy-theme="light"] [data-dsh-fairy-mascot
 							setPositioned(false);
 							return;
 						}
-						host.style.left = Math.round(rect.right - host.offsetWidth - 28) + "px";
+						const rightControlRect = rightSidebarToggle(document)?.getBoundingClientRect?.();
+						let left = rect.right - host.offsetWidth - 28;
+						if (rightControlRect && rightControlRect.width > 0 && rightControlRect.left < rect.right - 28 && rightControlRect.bottom > rect.top + 4 && rightControlRect.top < rect.top + 44) left = Math.min(left, rightControlRect.left - host.offsetWidth - 8);
+						host.style.left = Math.round(Math.max(rect.left + 8, left)) + "px";
 						host.style.top = Math.round(rect.top + 8) + "px";
 						setPositioned(true);
 					};
@@ -6454,7 +6466,7 @@ html[data-dsh-fairy-visual][data-dsh-fairy-theme="light"] [data-dsh-fairy-mascot
 			const numericComposerHeight = toFiniteNumber(source.composerDockHeight);
 			return {
 				version: SETTINGS_VERSION,
-				enabled: typeof source.enabled === "boolean" ? source.enabled : false,
+				enabled: typeof source.enabled === "boolean" ? source.enabled : true,
 				theme: source.theme === "light" ? "light" : "dark",
 				mascotVisible: typeof source.mascotVisible === "boolean" ? source.mascotVisible : true,
 				mascotScale: Number.isFinite(numericScale) ? clamp(numericScale, .55, 1) : 1,

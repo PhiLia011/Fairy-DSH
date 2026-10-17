@@ -26,6 +26,10 @@ const ARIA_LABELS = Object.freeze({
   newSession: Object.freeze({ zh: Object.freeze(['新建会话']), en: Object.freeze(['New session', 'New Session']) }),
   openSidebar: Object.freeze({ zh: Object.freeze(['打开侧边栏']), en: Object.freeze(['Open sidebar']) }),
   collapseSidebar: Object.freeze({ zh: Object.freeze(['收起侧边栏']), en: Object.freeze(['Collapse sidebar']) }),
+  rightSidebarToggle: Object.freeze({
+    zh: Object.freeze(['打开右侧边栏', '收起右侧边栏']),
+    en: Object.freeze(['Open right sidebar', 'Collapse right sidebar']),
+  }),
   send: Object.freeze({ zh: Object.freeze(['发送消息', '停止生成', '停止']), en: Object.freeze(['Send message', 'Stop generating', 'Stop']) }),
   sendOnly: Object.freeze({ zh: Object.freeze(['发送消息']), en: Object.freeze(['Send message']) }),
   context: Object.freeze({ zh: Object.freeze(['上下文']), en: Object.freeze(['Context']) }),
@@ -126,6 +130,7 @@ const OFFICIAL_SELECTORS = Object.freeze({
   sidebarBrandMark: '[data-slot="sidebar.brand.mark"]',
   openSidebar: ariaLabelSelector('openSidebar', { base: 'body > #root > [data-slot="root"] button' }),
   collapseSidebar: ariaLabelSelector('collapseSidebar', { base: 'body > #root > [data-slot="root"] button' }),
+  rightSidebarToggle: ariaLabelSelector('rightSidebarToggle', { base: 'button' }),
   newSession: ariaLabelSelector('newSession', { base: 'button' }),
   sessionHeader: '[data-slot="conversation.session.header"]',
   sessionHeaderActions: '[data-slot="conversation.session.header.actions"]',
@@ -290,6 +295,7 @@ function settingsDialog(doc = document) { return officialNode('settingsDialog', 
 function sidebarResizeHandle(scope = document) { return officialNode('sidebarResizeHandle', scope); }
 function sidebarOpenControl(doc = document) { return officialNode('openSidebar', doc); }
 function sidebarCollapseControl(doc = document) { return officialNode('collapseSidebar', doc); }
+function rightSidebarToggle(doc = document) { return officialNode('rightSidebarToggle', doc); }
 const reportedFuzzyMatches = new Set();
 
 function findByAriaLabelFuzzy(scope, { role, labels }) {
@@ -526,6 +532,7 @@ module.exports = {
   sidebarResizeHandle,
   sidebarOpenControl,
   sidebarCollapseControl,
+  rightSidebarToggle,
   sessionTree,
   sessionItems,
   expandedSessionItems,

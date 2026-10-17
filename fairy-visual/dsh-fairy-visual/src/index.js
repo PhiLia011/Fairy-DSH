@@ -13,7 +13,7 @@ export const FairyIdentitySettings = z.object({
 
 export const FairyVisualSettings = z.object({
   version: z.number().step(1).default(FAIRY_VISUAL_SETTINGS_VERSION),
-  enabled: z.boolean().default(false).volatile(),
+  enabled: z.boolean().default(true).volatile(),
   theme: z.union(['dark', 'light']).default('dark').volatile(),
   mascotVisible: z.boolean().default(true).volatile(),
   mascotScale: z.number().step(0.01).min(0.55).max(1).default(1).volatile(),

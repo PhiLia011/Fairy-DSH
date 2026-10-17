@@ -3,7 +3,7 @@ const { jsx, jsxs } = require('react/jsx-runtime');
 const { MODE_ATTR, HERO_PLACEHOLDERS } = require('./constants.js');
 const { createManagedMutationObserver } = require('./dom-observer-manager.js');
 const { mutationTouchesSurface, mutationTouchesHeroSurface } = require('./surface-utils.js');
-const { OFFICIAL_SELECTORS, OFFICIAL_ATTRIBUTES, sidebar, conversation, phase, composerSeat, composerCard, composerTextarea, composerPlaceholder } = require('./dom-adapter.js');
+const { OFFICIAL_SELECTORS, OFFICIAL_ATTRIBUTES, sidebar, conversation, phase, composerSeat, composerCard, composerTextarea, composerPlaceholder, rightSidebarToggle } = require('./dom-adapter.js');
 
 let heroMaskInstanceSeed = 0;
 
@@ -89,7 +89,16 @@ function install(_lifecycle = null, { Toggle, useController }) {
             setPositioned(false);
             return;
           }
-          host.style.left = Math.round(rect.right - host.offsetWidth - 28) + 'px';
+          const rightControl = rightSidebarToggle(document);
+          const rightControlRect = rightControl?.getBoundingClientRect?.();
+          let left = rect.right - host.offsetWidth - 28;
+          if (rightControlRect && rightControlRect.width > 0
+            && rightControlRect.left < rect.right - 28
+            && rightControlRect.bottom > rect.top + 4
+            && rightControlRect.top < rect.top + 44) {
+            left = Math.min(left, rightControlRect.left - host.offsetWidth - 8);
+          }
+          host.style.left = Math.round(Math.max(rect.left + 8, left)) + 'px';
           // Match the active conversation header: 44px header minus the
           // 28px toggle gives the same 8px top inset used by its flex layout.
           host.style.top = Math.round(rect.top + 8) + 'px';

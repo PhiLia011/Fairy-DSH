@@ -68,7 +68,7 @@ test('Visual Config exposes every user preference as a volatile field', () => {
   for (const field of ['enabled', 'theme', 'mascotVisible', 'mascotScale', 'mascotAnimationSpeed', 'powerMode', 'composerDockHeight']) {
     assert.equal(fields[field].meta.volatile, true, `${field} must be volatile`);
   }
-  assert.equal(fields.enabled.meta.default, false);
+  assert.equal(fields.enabled.meta.default, true);
   assert.equal(fields.theme.meta.default, 'dark');
   assert.equal(fields.composerDockHeight.meta.default, 132);
 });

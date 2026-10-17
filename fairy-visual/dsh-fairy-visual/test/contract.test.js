@@ -229,6 +229,12 @@ test('keeps Hero and active-session placeholder ownership mutually exclusive', (
   assert.match(activePlaceholder, /HeroHost owns the Hero textarea/);
 });
 
+test('keeps the Hero HDD toggle clear of the native right-sidebar control', () => {
+  assert.match(heroProjectionSource, /rightSidebarToggle\(document\)/);
+  assert.match(heroProjectionSource, /rightControlRect\.left - host\.offsetWidth - 8/);
+  assert.match(adapterSource, /rightSidebarToggle: ariaLabelSelector\('rightSidebarToggle'/);
+});
+
 test('limits root-level Hero observation to surface changes instead of chat streaming', () => {
   assert.match(surfaceUtilsSource, /function mutationTouchesHeroSurface\(records, officialSelectors, officialAttributes\)/);
   assert.match(surfaceUtilsSource, /officialSelectors\.phaseHero\}, \$\{officialSelectors\.phaseActive\}/);
